@@ -6,7 +6,7 @@ const User = require('../models/User');
 const auth = require('../middleware/auth');
 
 const generateToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '30d' });
+  jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 
 // POST /api/auth/register
 router.post(

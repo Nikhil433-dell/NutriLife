@@ -55,7 +55,9 @@ router.put('/:id', auth, async (req, res) => {
     if (!recipe) return res.status(404).json({ message: 'Recipe not found' });
 
     const fields = ['title', 'description', 'ingredients', 'instructions', 'nutritionInfo', 'isPublic'];
-    fields.forEach((f) => { if (req.body[f] !== undefined) recipe[f] = req.body[f]; });
+    fields.forEach((f) => {
+      if (req.body[f] !== undefined) recipe[f] = req.body[f];
+    });
 
     await recipe.save();
     res.json(recipe);

@@ -6,6 +6,12 @@ const rateLimit = require('express-rate-limit');
 
 dotenv.config();
 
+// Validate required environment variables
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is not set. Please configure your .env file.');
+  process.exit(1);
+}
+
 const app = express();
 
 // Rate limiting
@@ -56,8 +62,7 @@ mongoose
   })
   .catch((err) => {
     console.error('MongoDB connection error:', err.message);
-    // Still start server even without DB for development
-    app.listen(PORT, () => console.log(`Server running on port ${PORT} (no DB)`));
+    process.exit(1);
   });
 
 module.exports = app;
