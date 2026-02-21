@@ -1,0 +1,6 @@
+/* Additional global overrides can go here.
+   Main styles are in styles/globals.css and styles/components.css */
+
+body {
+  margin: 0;
+}
