@@ -1,9 +1,49 @@
-import React, { useState, useMemo } from 'react';
-import { SHELTERS } from '../data/shelters';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
+import { SHELTERS as FALLBACK_SHELTERS } from '../data/shelters';
+import { shelterApi } from '../utils/api';
 import { getMatchScore } from '../utils/helpers';
 import { getStatusLabel } from '../utils/statusHelpers';
-import { OccupancyBar, MatchBadge, Tag, Btn } from '../components/shared';
+import { OccupancyBar, MatchBadge, Tag } from '../components/shared';
 import { ShelterProfileModal } from '../components/modals';
+
+// Fix for default marker icons in react-leaflet
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
+  iconUrl: require('leaflet/dist/images/marker-icon.png'),
+  shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
+});
+
+// Fit map bounds to show all markers (only on initial load)
+function FitBounds({ shelters, skip }) {
+  const map = useMap();
+  const hasFitted = useRef(false);
+
+  useEffect(() => {
+    if (skip || hasFitted.current || shelters.length === 0) return;
+    const bounds = L.latLngBounds(
+      shelters.map((s) => [s.lat, s.lng])
+    );
+    map.fitBounds(bounds, { padding: [50, 50] });
+    hasFitted.current = true;
+  }, [map, shelters, skip]);
+
+  return null;
+}
+
+// Fly map to selected shelter when user clicks a card, marker, or "View details"
+function MapFlyTo({ selectedShelter }) {
+  const map = useMap();
+  useEffect(() => {
+    if (selectedShelter && selectedShelter.lat != null && selectedShelter.lng != null) {
+      map.flyTo([selectedShelter.lat, selectedShelter.lng], 15, { duration: 0.5 });
+    }
+  }, [map, selectedShelter]);
+  return null;
+}
 
 /**
  * MapView – interactive shelter map with sidebar list.
@@ -16,14 +56,20 @@ import { ShelterProfileModal } from '../components/modals';
  * @param {Function}    props.onBookmark
  */
 function MapView({ user, prefs = {}, bookmarks = [], onBookmark }) {
+  const [shelters, setShelters] = useState(FALLBACK_SHELTERS);
   const [selectedShelter, setSelectedShelter] = useState(null);
-  const [searchQuery, setSearchQuery]         = useState('');
-  const [filterService, setFilterService]     = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterService, setFilterService] = useState('all');
+  const [hasSelectedOnce, setHasSelectedOnce] = useState(false);
+
+  useEffect(() => {
+    shelterApi.getAll().then(setShelters).catch(() => {});
+  }, []);
 
   const ALL_SERVICES = ['all', 'meals', 'beds', 'showers', 'medical', 'counseling', 'childcare'];
 
   const filteredShelters = useMemo(() => {
-    return SHELTERS.filter((s) => {
+    return shelters.filter((s) => {
       const matchesSearch =
         s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.address.toLowerCase().includes(searchQuery.toLowerCase());
@@ -31,7 +77,12 @@ function MapView({ user, prefs = {}, bookmarks = [], onBookmark }) {
         filterService === 'all' || s.services.includes(filterService);
       return matchesSearch && matchesFilter;
     }).sort((a, b) => getMatchScore(b, prefs) - getMatchScore(a, prefs));
-  }, [searchQuery, filterService, prefs]);
+  }, [shelters, searchQuery, filterService, prefs]);
+
+  const handleSelectShelter = (shelter) => {
+    setSelectedShelter(shelter);
+    setHasSelectedOnce(true);
+  };
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
@@ -94,7 +145,7 @@ function MapView({ user, prefs = {}, bookmarks = [], onBookmark }) {
                 shelter={shelter}
                 prefs={prefs}
                 isBookmarked={bookmarks.includes(shelter.id)}
-                onSelect={() => setSelectedShelter(shelter)}
+                onSelect={() => handleSelectShelter(shelter)}
                 onBookmark={() => onBookmark?.(shelter.id)}
               />
             ))
@@ -103,25 +154,91 @@ function MapView({ user, prefs = {}, bookmarks = [], onBookmark }) {
       </aside>
 
       {/* Map Area */}
-      <main
-        style={{
-          flex: 1,
-          background: 'var(--color-bg)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexDirection: 'column',
-          gap: 16,
-        }}
-      >
-        <div style={{ fontSize: 64 }}>🗺️</div>
-        <h3 style={{ fontSize: 20, fontWeight: 600, color: 'var(--color-text)' }}>Map View</h3>
-        <p style={{ fontSize: 14, color: 'var(--color-text-muted)', textAlign: 'center', maxWidth: 300 }}>
-          Install <code>react-leaflet</code> and add a map tile provider to enable the interactive map.
-        </p>
-        <p style={{ fontSize: 13, color: 'var(--color-text-light)' }}>
-          Showing {filteredShelters.length} shelter{filteredShelters.length !== 1 ? 's' : ''} in the list.
-        </p>
+      <main style={{ flex: 1, position: 'relative' }}>
+        <MapContainer
+          center={[44.9778, -93.2650]} // Minneapolis, MN coordinates
+          zoom={12}
+          style={{ height: '100%', width: '100%' }}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <FitBounds shelters={filteredShelters} skip={hasSelectedOnce} />
+          <MapFlyTo selectedShelter={selectedShelter} />
+          {filteredShelters.map((shelter) => (
+            <Marker
+              key={shelter.id}
+              position={[shelter.lat, shelter.lng]}
+              eventHandlers={{
+                click: () => handleSelectShelter(shelter),
+              }}
+            >
+              <Popup>
+                <div style={{ minWidth: 200 }}>
+                  <h4 style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+                    {shelter.name}
+                  </h4>
+                  <p style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
+                    {shelter.address}
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <MatchBadge score={getMatchScore(shelter, prefs)} />
+                    <span style={{ fontSize: 11, color: '#999' }}>
+                      {shelter.distance} mi away
+                    </span>
+                  </div>
+                  <OccupancyBar 
+                    current={shelter.current} 
+                    capacity={shelter.capacity} 
+                    showLabel={true} 
+                  />
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
+                    {shelter.services.slice(0, 3).map((svc) => (
+                      <Tag key={svc} style={{ fontSize: 10, padding: '2px 6px' }}>{svc}</Tag>
+                    ))}
+                    {shelter.services.length > 3 && (
+                      <Tag style={{ fontSize: 10, padding: '2px 6px' }}>+{shelter.services.length - 3}</Tag>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectShelter(shelter)}
+                    style={{
+                      marginTop: 8,
+                      width: '100%',
+                      padding: '6px 12px',
+                      background: 'var(--color-primary)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    View Details
+                  </button>
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${shelter.lat},${shelter.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'block',
+                      marginTop: 6,
+                      fontSize: 12,
+                      color: 'var(--color-primary)',
+                      fontWeight: 600,
+                      textDecoration: 'none',
+                    }}
+                  >
+                    🧭 Get directions
+                  </a>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+        </MapContainer>
       </main>
 
       {/* Shelter Profile Modal */}
@@ -132,6 +249,21 @@ function MapView({ user, prefs = {}, bookmarks = [], onBookmark }) {
         prefs={prefs}
         isBookmarked={selectedShelter ? bookmarks.includes(selectedShelter.id) : false}
         onBookmark={onBookmark}
+        onGetDirections={(s) => {
+          const dest = `${s.lat},${s.lng}`;
+          const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}`;
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => {
+                const origin = `${pos.coords.latitude},${pos.coords.longitude}`;
+                window.open(`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`, '_blank', 'noopener,noreferrer');
+              },
+              () => window.open(url, '_blank', 'noopener,noreferrer')
+            );
+          } else {
+            window.open(url, '_blank', 'noopener,noreferrer');
+          }
+        }}
       />
     </div>
   );
@@ -139,7 +271,6 @@ function MapView({ user, prefs = {}, bookmarks = [], onBookmark }) {
 
 function ShelterCard({ shelter, prefs, isBookmarked, onSelect, onBookmark }) {
   const score = getMatchScore(shelter, prefs);
-  const pct   = Math.round((shelter.current / shelter.capacity) * 100);
 
   return (
     <div

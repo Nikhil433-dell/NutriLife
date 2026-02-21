@@ -11,6 +11,7 @@ import {
   OnboardingWizard,
 } from './pages';
 import useLocalStorage from './hooks/useLocalStorage';
+import { userApi } from './utils/api';
 
 const DEFAULT_PREFS = {
   needsMeals:          false,
@@ -49,17 +50,18 @@ function App() {
     setView(nextView);
   };
 
-  // Auth
-  const handleLogin = ({ email }) => {
-    // Mock auth – in production this would call userApi.login()
-    const mockUser = { id: Date.now(), name: email.split('@')[0], email, role: 'user', joinedAt: new Date().toISOString(), checkIns: [] };
-    setUser(mockUser);
+  // Auth — sync bookmarks from user when logging in
+  const handleLogin = async ({ email, password }) => {
+    const loggedIn = await userApi.login({ email, password });
+    setUser(loggedIn);
+    setBookmarks(loggedIn.bookmarks || []);
     setView('dashboard');
   };
 
-  const handleRegister = ({ name, email }) => {
-    const newUser = { id: Date.now(), name, email, role: 'user', joinedAt: new Date().toISOString(), checkIns: [] };
+  const handleRegister = async ({ name, email, password }) => {
+    const newUser = await userApi.register({ name, email, password });
     setUser(newUser);
+    setBookmarks(newUser.bookmarks || []);
     setShowOnboarding(true);
   };
 
@@ -68,11 +70,25 @@ function App() {
     setView('home');
   };
 
-  // Bookmarks
-  const handleBookmark = (shelterId) => {
-    setBookmarks((prev) =>
-      prev.includes(shelterId) ? prev.filter((id) => id !== shelterId) : [...prev, shelterId]
-    );
+  // Bookmarks — persist to API when user is logged in
+  const handleBookmark = async (shelterId) => {
+    if (!user) {
+      setBookmarks((prev) =>
+        prev.includes(shelterId) ? prev.filter((id) => id !== shelterId) : [...prev, shelterId]
+      );
+      return;
+    }
+    try {
+      if (bookmarks.includes(shelterId)) {
+        const next = await userApi.removeBookmark(user.id, shelterId);
+        setBookmarks(next);
+      } else {
+        const next = await userApi.addBookmark(user.id, shelterId);
+        setBookmarks(Array.isArray(next) ? next : [next]);
+      }
+    } catch (err) {
+      console.error('Bookmark update failed', err);
+    }
   };
 
   // Onboarding complete

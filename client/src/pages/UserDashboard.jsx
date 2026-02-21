@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { SHELTERS } from '../data/shelters';
+import React, { useState, useEffect } from 'react';
+import { SHELTERS as FALLBACK_SHELTERS } from '../data/shelters';
+import { shelterApi } from '../utils/api';
 import { getMatchScore } from '../utils/helpers';
 import { Avatar, Btn, OccupancyBar, MatchBadge, Tag } from '../components/shared';
 import { ShelterProfileModal } from '../components/modals';
@@ -15,11 +16,16 @@ import { ShelterProfileModal } from '../components/modals';
  * @param {Function} props.onNavigate
  */
 function UserDashboard({ user, prefs = {}, bookmarks = [], onBookmark, onNavigate }) {
+  const [shelters, setShelters] = useState(FALLBACK_SHELTERS);
   const [activeTab, setActiveTab]           = useState('overview');
   const [selectedShelter, setSelectedShelter] = useState(null);
 
-  const savedShelters = SHELTERS.filter((s) => bookmarks.includes(s.id));
-  const topMatches    = [...SHELTERS]
+  useEffect(() => {
+    shelterApi.getAll().then(setShelters).catch(() => {});
+  }, []);
+
+  const savedShelters = shelters.filter((s) => bookmarks.includes(s.id));
+  const topMatches    = [...shelters]
     .sort((a, b) => getMatchScore(b, prefs) - getMatchScore(a, prefs))
     .slice(0, 3);
 

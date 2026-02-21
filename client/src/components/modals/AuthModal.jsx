@@ -26,7 +26,7 @@ function AuthModal({ isOpen, onClose, onLogin, onRegister }) {
     setError('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
@@ -35,18 +35,22 @@ function AuthModal({ isOpen, onClose, onLogin, onRegister }) {
       return;
     }
 
-    if (tab === 'login') {
-      onLogin?.({ email, password });
-    } else {
-      if (!name) {
-        setError('Please enter your name.');
-        return;
-      }
-      onRegister?.({ name, email, password });
+    if (tab === 'register' && !name) {
+      setError('Please enter your name.');
+      return;
     }
 
-    reset();
-    onClose();
+    try {
+      if (tab === 'login') {
+        await onLogin?.({ email, password });
+      } else {
+        await onRegister?.({ name, email, password });
+      }
+      reset();
+      onClose();
+    } catch (err) {
+      setError(err?.message || 'Something went wrong. Please try again.');
+    }
   };
 
   const switchTab = (newTab) => {

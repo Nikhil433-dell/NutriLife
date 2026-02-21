@@ -29,6 +29,7 @@ const SERVICE_ICONS = {
  * @param {boolean}  [props.isBookmarked=false]
  * @param {Function} [props.onBookmark]
  * @param {Function} [props.onCheckIn]
+ * @param {Function} [props.onGetDirections] - (shelter) => open directions from user to shelter
  */
 function ShelterProfileModal({
   shelter,
@@ -38,6 +39,7 @@ function ShelterProfileModal({
   isBookmarked = false,
   onBookmark,
   onCheckIn,
+  onGetDirections,
 }) {
   if (!isOpen || !shelter) return null;
 
@@ -135,15 +137,23 @@ function ShelterProfileModal({
           </div>
 
           {/* Actions */}
-          <div style={{ display: 'flex', gap: 12 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+            {onGetDirections && (
+              <Btn
+                onClick={() => onGetDirections(shelter)}
+                style={{ flex: '1 1 100%', minWidth: 140 }}
+              >
+                🧭 Get Directions
+              </Btn>
+            )}
             <Btn
               variant={isBookmarked ? 'secondary' : 'ghost'}
               onClick={() => onBookmark?.(shelter.id)}
-              style={{ flex: 1 }}
+              style={{ flex: 1, minWidth: 100 }}
             >
               {isBookmarked ? '🔖 Saved' : '🔖 Save'}
             </Btn>
-            <Btn onClick={() => onCheckIn?.(shelter.id)} style={{ flex: 1 }}>
+            <Btn onClick={() => onCheckIn?.(shelter.id)} style={{ flex: 1, minWidth: 100 }}>
               📍 Check In
             </Btn>
           </div>

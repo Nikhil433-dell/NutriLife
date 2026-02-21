@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { SHELTERS } from '../data/shelters';
+import React, { useState, useEffect } from 'react';
+import { SHELTERS as FALLBACK_SHELTERS } from '../data/shelters';
 import { INITIAL_INVENTORY, INITIAL_DISTRIBUTIONS } from '../data/inventory';
-import { Btn, Tag } from '../components/shared';
+import { shelterApi, adminApi } from '../utils/api';
+import { Tag } from '../components/shared';
 
 /**
  * AdminDashboard – shelter management, inventory, and distributions overview.
@@ -11,12 +12,20 @@ import { Btn, Tag } from '../components/shared';
  */
 function AdminDashboard({ user }) {
   const [activeTab, setActiveTab] = useState('overview');
+  const [shelters, setShelters] = useState(FALLBACK_SHELTERS);
   const [inventory, setInventory] = useState(INITIAL_INVENTORY);
+  const [distributions, setDistributions] = useState(INITIAL_DISTRIBUTIONS);
+
+  useEffect(() => {
+    shelterApi.getAll().then(setShelters).catch(() => {});
+    adminApi.getInventory().then(setInventory).catch(() => {});
+    adminApi.getDistributions().then(setDistributions).catch(() => {});
+  }, []);
 
   const TABS = ['overview', 'shelters', 'inventory', 'distributions'];
 
-  const totalCapacity = SHELTERS.reduce((s, sh) => s + sh.capacity, 0);
-  const totalCurrent  = SHELTERS.reduce((s, sh) => s + sh.current, 0);
+  const totalCapacity = shelters.reduce((s, sh) => s + sh.capacity, 0);
+  const totalCurrent  = shelters.reduce((s, sh) => s + sh.current, 0);
   const lowStockItems = inventory.filter((i) => i.quantity <= i.threshold);
 
   return (
@@ -36,7 +45,7 @@ function AdminDashboard({ user }) {
 
       {/* Stats Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 24 }}>
-        <StatCard icon="🏠" label="Active Shelters" value={SHELTERS.length} color="var(--color-primary)" />
+        <StatCard icon="🏠" label="Active Shelters" value={shelters.length} color="var(--color-primary)" />
         <StatCard icon="👥" label="Total Occupants" value={`${totalCurrent} / ${totalCapacity}`} color="var(--color-info)" />
         <StatCard icon="📦" label="Inventory Items" value={inventory.length} color="var(--color-success)" />
         <StatCard icon="⚠️" label="Low Stock" value={lowStockItems.length} color="var(--color-danger)" />
@@ -66,7 +75,7 @@ function AdminDashboard({ user }) {
         <div className="card">
           <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 16 }}>Shelter Occupancy</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {SHELTERS.map((s) => {
+            {shelters.map((s) => {
               const pct = Math.round((s.current / s.capacity) * 100);
               const color = pct < 60 ? 'var(--color-success)' : pct < 85 ? 'var(--color-warning)' : 'var(--color-danger)';
               return (
@@ -99,7 +108,7 @@ function AdminDashboard({ user }) {
                 </tr>
               </thead>
               <tbody>
-                {SHELTERS.map((s) => (
+                {shelters.map((s) => (
                   <tr key={s.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <td style={{ padding: '10px 12px', fontWeight: 600 }}>{s.name}</td>
                     <td style={{ padding: '10px 12px', color: 'var(--color-text-muted)' }}>{s.address}</td>
@@ -148,7 +157,7 @@ function AdminDashboard({ user }) {
         <div className="card">
           <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 16 }}>Recent Distributions</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {INITIAL_DISTRIBUTIONS.map((dist) => (
+            {distributions.map((dist) => (
               <div key={dist.id} style={{ padding: 16, background: 'var(--color-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <div style={{ fontWeight: 700, color: 'var(--color-text)' }}>{dist.shelterName}</div>

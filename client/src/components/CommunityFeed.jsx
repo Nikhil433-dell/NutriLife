@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Avatar, Btn, Tag } from './shared';
 import { COMMUNITY_MESSAGES } from '../data/communityMessages';
+import { communityApi } from '../utils/api';
 
 const CATEGORY_COLOURS = {
   announcement: { bg: '#ebf8ff', color: '#2b6cb0' },
@@ -19,30 +20,38 @@ const CATEGORY_COLOURS = {
  */
 function CommunityFeed({ user, onAuthOpen }) {
   const [messages, setMessages] = useState(COMMUNITY_MESSAGES);
-  const [draft, setDraft]       = useState('');
+  const [draft, setDraft] = useState('');
 
-  const handlePost = () => {
+  useEffect(() => {
+    communityApi.getMessages().then(setMessages).catch(() => {});
+  }, []);
+
+  const handlePost = async () => {
     if (!user) { onAuthOpen?.(); return; }
     if (!draft.trim()) return;
 
-    const newMsg = {
-      id:        Date.now(),
-      userId:    user.id,
-      userName:  user.name,
-      avatar:    user.avatar,
-      message:   draft.trim(),
-      timestamp: new Date().toISOString(),
-      likes:     0,
-      replies:   0,
-      category:  'announcement',
-    };
-
-    setMessages([newMsg, ...messages]);
-    setDraft('');
+    try {
+      const newMsg = await communityApi.postMessage({
+        userId: user.id,
+        userName: user.name,
+        avatar: user.avatar,
+        message: draft.trim(),
+        category: 'announcement',
+      });
+      setMessages((prev) => [newMsg, ...prev]);
+      setDraft('');
+    } catch (err) {
+      console.error('Post failed', err);
+    }
   };
 
-  const handleLike = (id) => {
-    setMessages(messages.map((m) => (m.id === id ? { ...m, likes: m.likes + 1 } : m)));
+  const handleLike = async (id) => {
+    try {
+      await communityApi.likeMessage(id);
+      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, likes: (m.likes || 0) + 1 } : m)));
+    } catch (err) {
+      console.error('Like failed', err);
+    }
   };
 
   const formatTime = (iso) => {

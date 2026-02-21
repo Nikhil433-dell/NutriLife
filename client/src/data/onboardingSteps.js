@@ -3,14 +3,14 @@ export const ONBOARDING_STEPS = [
     id: 1,
     title: 'Welcome to NutriLife',
     description:
-      'We help connect people to nearby shelters, food resources, and community support. Let's personalize your experience.',
+      'We help connect people to nearby shelters, food resources, and community support. Let\'s personalize your experience.',
     icon: '🏠',
     fields: [],
   },
   {
     id: 2,
     title: 'Your Needs',
-    description: 'Tell us what you're looking for so we can show you the most relevant resources.',
+    description: 'Tell us what you\'re looking for so we can show you the most relevant resources.',
     icon: '🎯',
     fields: [
       { key: 'needsMeals', label: 'Meals & Nutrition', type: 'checkbox' },
@@ -45,9 +45,9 @@ export const ONBOARDING_STEPS = [
   },
   {
     id: 5,
-    title: 'You're All Set!',
+    title: 'You\'re All Set!',
     description:
-      'Your profile is ready. We'll show you personalized shelter and nutrition resources based on your preferences.',
+      'Your profile is ready. We\'ll show you personalized shelter and nutrition resources based on your preferences.',
     icon: '✅',
     fields: [],
   },
